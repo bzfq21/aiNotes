@@ -166,9 +166,9 @@ print(low_rank.shape)  # (100, 200)，但参数减少
 ```
 
 
-### 5. 主流模型压缩工具与框架 (2024版)
+## 主流模型压缩工具与框架
 
-现代模型压缩已经发展出完整的工具生态系统，以下是2024年最主流的工具：
+现代模型压缩已经发展出完整的工具生态系统，以下是最主流的工具：
 
 ### 🔧 综合压缩框架
 - **Intel Neural Compressor**: 支持PyTorch/TensorFlow的统一压缩库，支持量化、剪枝、蒸馏
@@ -192,9 +192,9 @@ print(low_rank.shape)  # (100, 200)，但参数减少
 - **TinyBERT**: 专为BERT设计的蒸馏框架
 - **MobileBERT**: 移动端优化蒸馏
 
-## 6. 高级代码示例与最佳实践
+## 高级代码示例与最佳实践
 
-### 6.1 结构化剪枝 vs 非结构化剪枝完整实现
+###  结构化剪枝 vs 非结构化剪枝完整实现
 
 ```python
 import torch
@@ -270,7 +270,7 @@ print(f"剪枝后通道数: {len(pruned_indices)}")
 - **非结构化剪枝**：参数减少90%，但稀疏矩阵计算效率低
 - **混合剪枝**：先结构化后非结构化，平衡压缩率和性能
 
-### 6.2 三种量化方式完整实现
+### 三种量化方式完整实现
 
 ```python
 import torch
@@ -359,7 +359,7 @@ model = SimpleCNN()
 | QAT量化 | 75% | 3x | <0.5% | 高精度要求 |
 | INT4量化 | 87.5% | 8x | 2-3% | 极致压缩 |
 
-### 6.3 高级知识蒸馏技术
+### 高级知识蒸馏技术
 
 ```python
 import torch.nn.functional as F
@@ -428,7 +428,7 @@ class TinyBERTDistillation:
 distiller = TinyBERTDistillation()
 ```
 
-### 6.4 LoRA/AdaLoRA/QLoRA 完整实现
+### LoRA/AdaLoRA/QLoRA 完整实现
 
 ```python
 from peft import LoraConfig, get_peft_model, AdaLoraConfig
@@ -506,9 +506,9 @@ lora_performance = {
 }
 ```
 
-## 7. 混合压缩策略与实战部署
+## 混合压缩策略与实战部署
 
-### 7.1 组合压缩策略
+### 组合压缩策略
 
 ```python
 class HybridCompressor:
@@ -547,7 +547,7 @@ hybrid_performance = {
 }
 ```
 
-### 7.2 生产环境部署优化
+### 生产环境部署优化
 
 ```python
 # TensorRT优化
@@ -602,7 +602,7 @@ CMD ["python", "inference.py"]
 '''
 ```
 
-## 8. 最终性能对比表
+## 最终性能对比表
 
 | 压缩方法 | 参数减少 | 推理速度提升 | 准确率损失 | 适用场景 | 工具推荐 |
 |---------|----------|-------------|-----------|----------|----------|
@@ -615,24 +615,7 @@ CMD ["python", "inference.py"]
 | INT4量化 | 87.5% | 8x | 2-3% | 极致压缩 | GPTQ |
 | 混合策略 | 90%+ | 10x+ | <3% | 极致优化 | 组合方法 |
 
-## 9. 实战建议与最佳实践
-
-### 🎯 实践路径建议
-
-**初学者路径** (1-2周):
-1. 从LoRA开始：使用PEFT库对预训练模型进行微调
-2. 简单量化：使用PyTorch的动态量化
-3. 验证效果：在小型数据集上测试压缩效果
-
-**中级用户路径** (2-4周):
-1. 结构化剪枝：使用PyTorch Pruning模块
-2. 知识蒸馏：使用Hugging Face Transformers
-3. 组合优化：剪枝+量化组合应用
-
-**高级用户路径** (1-2个月):
-1. 自定义压缩算法：根据硬件特性优化
-2. 混合压缩策略：多种方法组合使用
-3. 生产部署：TensorRT/ONNX Runtime优化
+## 最佳实践
 
 ### 📊 选择决策树
 
@@ -653,6 +636,38 @@ CMD ["python", "inference.py"]
 
 1. **过度压缩**: 准确率下降>5%
    - 解决方案：逐步压缩，每步验证准确率
+   ```python
+   def gradual_compression(model, target_accuracy):
+       current_accuracy = evaluate_model(model)
+       while current_accuracy > target_accuracy:
+           model = compress_model(model)
+           current_accuracy = evaluate_model(model)
+       return model
+
+    # 伪代码示例
+    for layer in model.layers:
+        for prune_ratio in [0.1, 0.2, 0.3, 0.4, 0.5]:
+            # 对该层应用剪枝
+            prune_layer(layer, prune_ratio)
+            # 在验证集上评估精度
+            accuracy = evaluate(model, val_data)
+            # 记录精度损失
+            accuracy_drop = original_accuracy - accuracy
+            # 找到精度损失可接受的最大剪枝比例   
+            if accuracy_drop <= max_drop:
+                max_drop = accuracy_drop
+                best_prune_ratio = prune_ratio
+            # 应用最佳剪枝比例
+            prune_layer(layer, best_prune_ratio)
+    
+    # 逐步剪枝示例
+    for step in range(3):
+        # 每次剪枝10%
+        prune_model(model, amount=0.1)
+        # 微调恢复精度
+        fine_tune(model, lr=1e-4, epochs=5)
+  
+  ```
 
 2. **硬件不兼容**: 某些设备不支持量化
    - 解决方案：使用ONNX Runtime统一格式
@@ -663,30 +678,8 @@ CMD ["python", "inference.py"]
 4. **校准数据不足**: 量化后效果差
    - 解决方案：使用1000+代表性样本校准
 
-## 10. 总结与展望
-
-通过本文的补充，您现在掌握了：
-
-1. **完整的工具链**: 从基础PyTorch到专业框架
-2. **实战代码**: 可直接复制运行的完整示例
-3. **性能数据**: 基于真实测试的量化对比
-4. **部署方案**: 生产环境的完整流程
-5. **最佳实践**: 分阶段的实施建议
-
-模型压缩技术正在快速发展，未来趋势包括：
-- **自动化压缩**: AutoML驱动的压缩策略
-- **硬件协同**: 芯片级优化压缩算法
-- **绿色AI**: 碳足迹优化的压缩方法
-
-无论您是AI初学者还是资深开发者，都可以从本文找到适合自己的压缩方案。建议从简单方法开始，逐步深入，最终实现性能与资源的最佳平衡。
-
-**📚 进一步学习资源**:
-- [Intel Neural Compressor文档](https://intel.github.io/neural-compressor/)
-- [PyTorch量化教程](https://pytorch.org/tutorials/recipes/quantization.html)
-- [Hugging Face PEFT文档](https://huggingface.co/docs/peft)
-- [NVIDIA TensorRT指南](https://docs.nvidia.com/deeplearning/tensorrt/)
-
-**🚀 开始实践**: 选择您感兴趣的章节，复制代码到本地环境，开始您的模型压缩之旅！
+5. **部署复杂度**: 部署过程繁琐
+   - 解决方案：使用统一部署框架，如ONNX Runtime
 
 ## 模型压缩的实际应用与挑战
 
