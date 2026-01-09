@@ -174,23 +174,31 @@ print(low_rank.shape)  # (100, 200)，但参数减少
 - **Intel Neural Compressor**: 支持PyTorch/TensorFlow的统一压缩库，支持量化、剪枝、蒸馏
 - **NVIDIA ModelOpt**: 支持TensorRT优化的统一优化框架
 - **ONNX Runtime**: 跨平台推理优化引擎，支持INT8/FP16量化
-- **Apache TVM**: 深度学习编译器，支持自动优化
+
 
 ### ✂️ 剪枝专用工具
 - **PyTorch Pruning**: 内置的`torch.nn.utils.prune`模块
 - **NNI (Neural Network Intelligence)**: 微软的自动化压缩工具
 - **Torch-Pruning**: 高级结构化剪枝库
+- **LLM-Pruner**: 逐层学习幅度剪枝
+- **SparseLLM**: 全局剪枝
+- **Wanda**: 基于权重和激活的剪枝方法
+
 
 ### ⚖️ 量化工具
 - **PyTorch Quantization**: 官方量化支持
-- **TensorRT**: NVIDIA的推理优化引擎
 - **QNNPACK**: Facebook的移动端量化库
 - **GPTQ**: 大模型量化专用工具
+- **llama.cpp**: 其本身是一个推理框架，但是支持量化与剪枝
+- **SqueezeLLM**: 非均匀量化+稀疏分解，3位量化表现突出
+- **TensorRT**: NVIDIA的推理优化引擎，支持INT8/FP16量化
+
 
 ### 🎓 知识蒸馏框架
 - **Hugging Face Distillation**: Transformers库的蒸馏支持
-- **TinyBERT**: 专为BERT设计的蒸馏框架
+- **FastDistill**: 专为大模型设计，支持多教师蒸馏
 - **MobileBERT**: 移动端优化蒸馏
+- **Distiller**: 基于PyTorch的蒸馏框架，支持多种蒸馏方法和模型转换
 
 ## 高级代码示例与最佳实践
 
@@ -648,6 +656,33 @@ class SimpleCNN(nn.Module):
 
 model = SimpleCNN()
 ```
+
+#### 基础量化命令
+```
+
+# 将HF格式模型转换为GGUF格式
+python convert_hf_to_gguf.py ./models/your-model/ --outfile model-f16.gguf
+
+# 执行4-bit量化
+./llama-quantize model-f16.gguf model-q4km.gguf Q4_K_M
+
+# 使用重要性矩阵优化量化
+./llama-imatrix -m model-f16.gguf -f calibration-data.txt -o imatrix.dat
+./llama-quantize --imatrix imatrix.dat model-f16.gguf model-optimized.gguf Q4_K_M
+```
+#### 渐进式剪枝优化
+```
+# 第一阶段：轻度量化
+./quantize model.f32.gguf model.q8_0.gguf Q8_0
+
+# 第二阶段：中度量化+轻度剪枝
+./quantize --prune-layers 10,15 model.q8_0.gguf model.q4_0.gguf Q4_0
+
+# 第三阶段：深度优化
+./quantize --prune-layers 5,10,15,20 --imatrix imatrix.gguf model.q4_0.gguf final.gguf Q4_0
+
+```
+
 
 **量化性能对比表**：
 
