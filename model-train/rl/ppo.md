@@ -23,7 +23,7 @@ $$M = (\mathcal{S}, \mathcal{A}, P, r, \gamma)$$
 
 $$J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[R(\tau)]$$
 
-其中 $\tau = (s_0, a_0, r_0, s_1, a_1, r_1, ...)$ 是轨迹，$R(\tau) = \sum_{t=0}^{\infty} \gamma^t r_t$ 是轨迹的折扣回报。
+其中 $\pi_\theta$是策略，$\tau = (s_0, a_0, r_0, s_1, a_1, r_1, ...)$ 是轨迹，$R(\tau) = \sum_{t=0}^{\infty} \gamma^t r_t$ 是轨迹的折扣回报
 
 更具体地，轨迹概率分布为：
 
@@ -125,7 +125,40 @@ $$\nabla_\theta J(\theta) = \int_0^{\infty} \gamma^t \mathbb{E}_{s_t \sim \pi_\t
 
 $$\nabla_\theta J(\theta) = \mathbb{E}_{s \sim \rho^{\pi_\theta}, a \sim \pi_\theta(\cdot|s)}[\nabla_\theta \log \pi_\theta(a|s) \cdot A^{\pi_\theta}(s,a)]$$
 
-#### 1.2.10 推导总结与关键洞察
+#### 1.2.10 策略 $\pi_\theta$ 的数学定义与特性
+
+**策略 $\pi_\theta$ 的基本定义**:
+- **$\pi_\theta(a|s)$**: 参数为 θ 的随机策略，表示在状态 s 下采取动作 a 的概率
+- **θ ∈ ℝ^d**: 策略参数向量，通常通过神经网络实现
+- **约束条件**: $\sum_{a\in\mathcal{A}} \pi_\theta(a|s) = 1$, $∀s \in \mathcal{S}$
+
+**常见实现形式**:
+
+1. **Softmax策略（分类动作空间）**:
+   $$\pi_\theta(a|s) = \frac{\exp(f_\theta(s,a))}{\sum_{a'\in\mathcal{A}} \exp(f_\theta(s,a'))}$$
+   其中 $f_\theta(s,a)$ 是神经网络输出
+
+2. **高斯策略（连续动作空间）**:
+   $$\pi_\theta(a|s) = \mathcal{N}(a | \mu_\theta(s), \sigma_\theta^2(s))$$
+   其中 $\mu_\theta(s)$ 和 $\sigma_\theta(s)$ 由神经网络输出
+
+3. **策略梯度中的对数导数**:
+   $$\nabla_\theta \log \pi_\theta(a|s) = \frac{\nabla_\theta \pi_\theta(a|s)}{\pi_\theta(a|s)}$$
+
+**在PPO中的角色**:
+- **当前策略**: $\pi_\theta$ 正在优化的策略
+- **旧策略**: $\pi_{\theta_{\text{old}}}$ 用于收集经验的策略
+- **重要性权重**: $r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}$
+
+**数学性质**:
+- **可微性**: $\pi_\theta(a|s)$ 对 $\theta$ 可微
+- **归一化**: $\sum_a \pi_\theta(a|s) = 1$
+- **非负性**: $\pi_\theta(a|s) \geq 0$
+
+**在PPO算法中的更新**:
+$\pi_\theta$ 的更新通过最大化剪切目标函数 $L^{\text{CLIP}}(\theta)$ 来实现，同时保持与 $\pi_{\theta_{\text{old}}}$ 的KL散度在约束范围内。
+
+#### 1.2.11 推导总结与关键洞察
 
 策略梯度推导的关键洞察：
 
