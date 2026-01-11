@@ -119,11 +119,13 @@ $$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T
 
 对于连续时间，考虑随机策略梯度：
 
-$$\nabla_\theta J(\theta) = \int_0^{\infty} \gamma^t \mathbb{E}_{s_t \sim \pi_\theta}[\int_{\mathcal{A}} \nabla_\theta \pi_\theta(a|s_t) Q^{\pi_\theta}(s_t,a) da] dt$$
+$$\nabla_\theta J(\theta) = \int_0^{T} \gamma^t \mathbb{E}_{s_t \sim \pi_\theta}\left[\int_{\mathcal{A}} \nabla_\theta \pi_\theta(a|s_t) Q^{\pi_\theta}(s_t,a) da\right] dt$$
 
 使用平稳分布 $\rho^{\pi_\theta}(s)$：
 
 $$\nabla_\theta J(\theta) = \mathbb{E}_{s \sim \rho^{\pi_\theta}, a \sim \pi_\theta(\cdot|s)}[\nabla_\theta \log \pi_\theta(a|s) \cdot A^{\pi_\theta}(s,a)]$$
+
+其中 $\rho^{\pi_\theta}(s)$ 是策略 $\pi_\theta$ 下的稳态分布。
 
 #### 1.2.10 策略 $\pi_\theta$ 的数学定义与特性
 
@@ -306,14 +308,30 @@ $$J(\theta) - J(\theta_{\text{old}}) \geq \frac{1}{1-\gamma}\mathbb{E}_{s \sim \
 
 ## 7. 理论保证
 
-PPO 的理论保证基于以下关键结果：
+### 7.1 策略改进下界
 
-**定理**（PPO 单调改进）：对于任意 $\theta_{\text{old}}$ 和 $\theta$，如果满足：
+PPO 的理论保证基于策略改进下界理论。考虑KL散度约束下的策略优化问题：
+
+**定理**（PPO 策略改进下界）：对于任意策略 $\pi_{\theta}$ 和 $\pi_{\theta_{\text{old}}}$，如果满足：
 
 $$\max_s \text{KL}(\pi_{\theta_{\text{old}}}(\cdot|s) \| \pi_\theta(\cdot|s)) \leq \delta$$
 
-则有：
+则有策略改进下界：
 
-$$J(\theta) - J(\theta_{\text{old}}) \geq \frac{\sqrt{2\delta}\epsilon}{1-\gamma} \mathbb{E}_{s \sim \rho^{\pi_{\theta_{\text{old}}}}}\left[\sum_a \pi_\theta(a|s) A^{\pi_{\theta_{\text{old}}}}(s,a)\right]$$
+$$J(\theta) - J(\theta_{\text{old}}) \geq \frac{1}{1-\gamma}\mathbb{E}_{s \sim \rho^{\pi_{\theta_{\text{old}}}}}\left[\sum_a \pi_\theta(a|s) A^{\pi_{\theta_{\text{old}}}}(s,a)\right] - \frac{2\gamma}{(1-\gamma)^2}\epsilon_{\text{max}}\delta$$
 
-这个定理保证了 PPO 算法的单调改进性质
+其中 $\epsilon_{\text{max}} = \max_{s,a} |A^{\pi_{\theta_{\text{old}}}}(s,a)|$ 是最大优势值，$\rho^{\pi_{\theta_{\text{old}}}}(s)$ 是折扣状态分布。
+
+### 7.2 收敛性保证
+
+**收敛条件**：
+为确保策略改进，需要满足：
+$$\mathbb{E}_{s \sim \rho^{\pi_{\theta_{\text{old}}}}}\left[\sum_a \pi_\theta(a|s) A^{\pi_{\theta_{\text{old}}}}(s,a)\right] \geq \frac{2\gamma\epsilon_{\text{max}}}{1-\gamma}\delta$$
+
+**单调性保证**：
+在满足KL约束 $\delta$ 的条件下，PPO算法保证策略性能单调不减，即：
+$$J(\theta_{k+1}) \geq J(\theta_k)$$
+
+### 7.3 样本复杂度
+
+PPO的样本复杂度为 $\tilde{O}(\frac{1}{\epsilon^2(1-\gamma)^2})$，其中 $\epsilon$ 是目标精度，$\gamma$ 是折扣因子。
