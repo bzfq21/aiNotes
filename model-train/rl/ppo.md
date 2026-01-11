@@ -15,19 +15,126 @@ $$M = (\mathcal{S}, \mathcal{A}, P, r, \gamma)$$
 - $r(s,a)$ 是即时奖励函数
 - $\gamma \in [0,1]$ 是折扣因子
 
-### 1.2 策略梯度方法回顾
+### 1.2 策略梯度定理的完整推导
 
-策略梯度方法的目标是最大化期望回报：
+#### 1.2.1 期望回报的定义与展开
+
+策略梯度方法的目标是最大化期望回报。首先明确定义期望回报：
 
 $$J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[R(\tau)]$$
 
-其中 $\tau = (s_0, a_0, r_0, s_1, ...)$ 是轨迹，$R(\tau) = \sum_{t=0}^{\infty} \gamma^t r_t$ 是轨迹的折扣回报。
+其中 $\tau = (s_0, a_0, r_0, s_1, a_1, r_1, ...)$ 是轨迹，$R(\tau) = \sum_{t=0}^{\infty} \gamma^t r_t$ 是轨迹的折扣回报。
 
-根据策略梯度定理，我们有：
+更具体地，轨迹概率分布为：
+
+$$P(\tau|\theta) = \rho_0(s_0) \prod_{t=0}^{\infty} P(s_{t+1}|s_t,a_t) \pi_\theta(a_t|s_t)$$
+
+其中 $\rho_0(s_0)$ 是初始状态分布，$P(s_{t+1}|s_t,a_t)$ 是环境转移概率。
+
+因此期望回报可写成：
+
+$$J(\theta) = \int P(\tau|\theta) R(\tau) d\tau$$
+
+#### 1.2.2 梯度推导：从基础定义开始
+
+对 $\theta$ 求梯度：
+
+$$\nabla_\theta J(\theta) = \nabla_\theta \int P(\tau|\theta) R(\tau) d\tau$$
+
+由于积分和微分可交换（在适当正则条件下）：
+
+$$\nabla_\theta J(\theta) = \int \nabla_\theta P(\tau|\theta) R(\tau) d\tau$$
+
+使用对数导数技巧：$\nabla f = f \nabla \log f$，得到：
+
+$$\nabla_\theta P(\tau|\theta) = P(\tau|\theta) \nabla_\theta \log P(\tau|\theta)$$
+
+因此：
+
+$$\nabla_\theta J(\theta) = \int P(\tau|\theta) \nabla_\theta \log P(\tau|\theta) R(\tau) d\tau = \mathbb{E}_{\tau \sim \pi_\theta}[\nabla_\theta \log P(\tau|\theta) R(\tau)]$$
+
+#### 1.2.3 展开轨迹概率的对数
+
+展开 $\log P(\tau|\theta)$：
+
+$$\log P(\tau|\theta) = \log \rho_0(s_0) + \sum_{t=0}^{\infty} [\log P(s_{t+1}|s_t,a_t) + \log \pi_\theta(a_t|s_t)]$$
+
+对 $\theta$ 求导时，只有 $\pi_\theta(a_t|s_t)$ 依赖于 $\theta$，因此：
+
+$$\nabla_\theta \log P(\tau|\theta) = \sum_{t=0}^{\infty} \nabla_\theta \log \pi_\theta(a_t|s_t)$$
+
+#### 1.2.4 得到初步梯度表达式
+
+代入得到初步梯度表达式：
+
+$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\left(\sum_{t=0}^{\infty} \nabla_\theta \log \pi_\theta(a_t|s_t)\right) \left(\sum_{k=0}^{\infty} \gamma^k r_k\right)\right]$$
+
+#### 1.2.5 利用因果结构简化
+
+利用因果结构，我们知道 $r_k$ 只依赖于 $(s_t,a_t)$ 对于 $t \leq k$。因此可以写成：
+
+$$\nabla_\theta J(\theta) = \sum_{t=0}^{\infty} \mathbb{E}_{\tau \sim \pi_\theta}[\nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \mathbb{E}[\sum_{k=t}^{\infty} \gamma^k r_k | s_t, a_t]]$$
+
+定义状态-动作价值函数：
+
+$$Q^{\pi_\theta}(s,a) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{k=0}^{\infty} \gamma^k r_{t+k} \Big| s_t=s, a_t=a\right]$$
+
+因此：
+
+$$\nabla_\theta J(\theta) = \sum_{t=0}^{\infty} \mathbb{E}_{s_t,a_t \sim \pi_\theta}[\nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \gamma^t Q^{\pi_\theta}(s_t,a_t)]$$
+
+#### 1.2.6 引入基线减除降低方差
+
+注意到对于任意函数 $b(s)$ 不依赖于 $a$：
+
+$$\mathbb{E}_{a \sim \pi_\theta(\cdot|s)}[\nabla_\theta \log \pi_\theta(a|s) b(s)] = b(s) \mathbb{E}_{a \sim \pi_\theta(\cdot|s)}[\nabla_\theta \log \pi_\theta(a|s)] = 0$$
+
+因为 $\sum_{a \in \mathcal{A}} \pi_\theta(a|s) = 1$。
+
+选择基线为状态价值函数：
+
+$$V^{\pi_\theta}(s) = \sum_{a \in \mathcal{A}} \pi_\theta(a|s) Q^{\pi_\theta}(s,a)$$
+
+因此可以写成：
+
+$$\nabla_\theta J(\theta) = \sum_{t=0}^{\infty} \mathbb{E}_{s_t,a_t \sim \pi_\theta}[\nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \gamma^t (Q^{\pi_\theta}(s_t,a_t) - V^{\pi_\theta}(s_t))]$$
+
+#### 1.2.7 最终策略梯度定理
+
+定义优势函数：
+
+$$A^{\pi_\theta}(s,a) = Q^{\pi_\theta}(s,a) - V^{\pi_\theta}(s)$$
+
+得到策略梯度定理的最终形式：
 
 $$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{\infty} \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot A^{\pi_\theta}(s_t, a_t)\right]$$
 
-其中 $A^{\pi_\theta}(s,a) = Q^{\pi_\theta}(s,a) - V^{\pi_\theta}(s)$ 是优势函数。
+#### 1.2.8 离散时间有限范围版本
+
+对于有限时间范围 $T$，策略梯度定理简化为：
+
+$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T-1} \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot A^{\pi_\theta}(s_t, a_t)\right]$$
+
+#### 1.2.9 连续时间版本
+
+对于连续时间，考虑随机策略梯度：
+
+$$\nabla_\theta J(\theta) = \int_0^{\infty} \gamma^t \mathbb{E}_{s_t \sim \pi_\theta}[\int_{\mathcal{A}} \nabla_\theta \pi_\theta(a|s_t) Q^{\pi_\theta}(s_t,a) da] dt$$
+
+使用平稳分布 $\rho^{\pi_\theta}(s)$：
+
+$$\nabla_\theta J(\theta) = \mathbb{E}_{s \sim \rho^{\pi_\theta}, a \sim \pi_\theta(\cdot|s)}[\nabla_\theta \log \pi_\theta(a|s) \cdot A^{\pi_\theta}(s,a)]$$
+
+#### 1.2.10 推导总结与关键洞察
+
+策略梯度推导的关键洞察：
+
+1. **对数导数技巧**：$\nabla f = f \nabla \log f$ 将梯度转换为对数形式
+2. **因果分解**：利用马尔可夫性质，将未来奖励与当前决策分离
+3. **基线减除**：通过减去状态价值函数降低方差，不改变期望
+4. **期望表示**：将梯度表示为期望形式，便于蒙特卡洛估计
+
+最终，策略梯度定理的核心是：**策略梯度等于对数策略梯度与优势函数的期望乘积**。
 
 ## 2. PPO 目标函数的数学推导
 
