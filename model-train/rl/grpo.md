@@ -128,6 +128,65 @@ for iteration in range(num_iterations):
         optimizer.step()
 ```
 
+### 4.1.1 GRPO算法训练流程图
+
+GRPO训练采用**迭代式分组优化**框架，核心流程如下：
+
+```mermaid
+flowchart TD
+    Start([策略模型 πθ<br>初始参数θ₀]) --> Sample["采样阶段<br>对提示集合D采样K组<br>每组G个响应"]
+    Sample --> Reward["奖励计算<br>奖励模型r(s,a)评分<br>得到{r₁,...,r_G}"]
+    Reward --> Group["组内归一化<br>计算μ_r, σ_r<br>得到归一化奖励{r̂₁,...,r̂_G}"]
+    Group --> Advantage["优势估计<br>A_i = r̂_i<br>无需价值函数"]
+    Advantage --> Objective["GRPO目标<br>min(ratio·r̂, clip(ratio)·r̂)"]
+    Objective --> Update["策略更新<br>θ ← θ + α∇L_GRPO"]
+    Update --> KL["KL约束检查<br>KL(πθ‖π_ref) < δ"]
+    KL -->|"满足"| Next([下一轮迭代])
+    KL -->|"超限"| Beta["调整KL系数β"]
+    Beta --> Next
+    Next -->|"继续训练"| Sample
+    Next -->|"收敛"| End([最终策略模型])
+    
+    subgraph 训练数据流
+        Data["提示池D<br>固定训练集"]
+        Data -.-> Sample
+    end
+    
+    subgraph 核心计算
+        Stats["组内统计<br>μ_r = mean(r)<br>σ_r = std(r)"]
+        Clip["Clip机制<br>ε = 0.2"]
+        KL_calc["KL散度<br>β = 0.01-0.1"]
+    end
+    
+    classDef startEnd fill:#e1f5fe,stroke:#01579b
+    classDef process fill:#f3e5f5,stroke:#4a148c
+    classDef dataflow fill:#e8f5e8,stroke:#1b5e20
+    classDef compute fill:#fff3e0,stroke:#e65100
+    
+    class Start,End startEnd
+    class Sample,Reward,Group,Advantage,Objective,Update,KL,Beta process
+    class Data dataflow
+    class Stats,Clip,KL_calc compute
+```
+
+**训练阶段详细说明**：
+
+| 阶段 | 关键操作 | 数学表达 | 实现要点 |
+|---|---|---|---|
+| **采样** | 批量提示采样 | $\{s_i\}_{i=1}^B$ | 确保每组内样本相关性 |
+| **评分** | 奖励模型评估 | $\{r_i\}_{i=1}^G$ | 统一评分标准，避免尺度问题 |
+| **归一化** | 组内标准化 | $\hat{r}_i = \frac{r_i - \mu_r}{\sigma_r + \epsilon}$ | 防止除零，$\epsilon=10^{-8}$ |
+| **优势估计** | 直接优势计算 | $A_i = \hat{r}_i$ | 无需价值网络，计算简化 |
+| **策略更新** | PPO-style更新 | $L^{\text{GRPO}}(\theta)$ | 保持clip机制稳定性 |
+| **约束检查** | KL散度监控 | $\text{KL}(\pi_\theta \|\| \pi_{\text{ref}}) < \delta$ | 防止策略过度偏离 |
+
+**关键特性**：
+- **无价值网络**：直接利用组内相对奖励作为优势估计
+- **统计稳定性**：通过组内归一化减少奖励尺度影响
+- **计算效率**：相比PPO减少约50%训练时间
+- **内存优化**：无需额外价值函数网络参数
+5. **监控与调整**：实时监控KL散度，必要时调整惩罚系数β
+
 ### 4.2 关键参数
 
 | 参数 | 符号 | 典型值 | 说明 |
