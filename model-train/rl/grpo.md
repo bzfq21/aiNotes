@@ -41,15 +41,17 @@ $$\hat{r}_i = \frac{r_i - \mu_r}{\sigma_r + \epsilon}$$
 
 ### 2.3 优势函数估计
 
-GRPO 的优势函数估计简化为归一化奖励：
+GRPO的优势函数估计直接使用归一化奖励作为优势估计：
 
-$$A_i^{\text{GRPO}} = \hat{r}_i$$
+$$A_i^{\text{GRPO}}(s_i, a_i) = \hat{r}_i$$
 
-这与传统PPO中的GAE（Generalized Advantage Estimation）不同，后者需要：
+其中 $\hat{r}_i$ 是第2.2节定义的归一化奖励，$(s_i, a_i)$ 表示第 $i$ 个状态-动作对。这种设计将优势估计简化为组内相对性能的度量，无需额外估计状态价值函数。
 
-$$A_t^{\text{GAE}} = \sum_{l=0}^{\infty}(\gamma\lambda)^l\delta_{t+l}$$
+这与传统PPO中的GAE（Generalized Advantage Estimation）形成鲜明对比，后者需要完整的时间差分学习框架：
 
-其中 $\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$ 需要价值函数 $V$。
+$$A_t^{\text{GAE}}(\gamma, \lambda) = \sum_{k=0}^{\infty}(\gamma\lambda)^k \delta_{t+k}^{\text{TD}}$$
+
+其中 $\delta_t^{\text{TD}} = r_t + \gamma V_{\phi}(s_{t+1}) - V_{\phi}(s_t)$ 是时间差分误差，$V_{\phi}$ 是由参数 $\phi$ 定义的状态价值函数网络。GAE需要同时训练策略网络和价值网络两个独立的网络结构。
 
 ## 3. 目标函数推导
 
