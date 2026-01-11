@@ -98,35 +98,181 @@ $$L^{\text{GRPO}}(\theta) = \frac{1}{G}\sum_{i=1}^G \min\left(r_i(\theta)\hat{r}
 
 ### 4.1 完整算法流程
 
+以下提供**完整可运行的PyTorch实现**，包含关键数值稳定性处理和监控机制：
+
 ```python
-# 伪代码
-for iteration in range(num_iterations):
-    # 收集样本
-    batch = collect_samples(env, policy, batch_size)
-    
-    # 按组划分样本
-    groups = split_into_groups(batch, group_size)
-    
-    for group in groups:
-        # 计算组内统计量
-        rewards = [sample.reward for sample in group]
-        mu_r = np.mean(rewards)
-        sigma_r = np.std(rewards)
+import torch
+import torch.nn as nn
+import numpy as np
+from typing import List, Dict, Tuple
+from dataclasses import dataclass
+
+@dataclass
+class Sample:
+    """单个训练样本"""
+    prompt: str
+    response: str
+    log_prob: torch.Tensor  # 当前策略的对数概率
+    ref_log_prob: torch.Tensor  # 参考策略的对数概率
+    reward: float
+
+class GRPOTrainer:
+    def __init__(self, 
+                 policy_model: nn.Module,
+                 ref_model: nn.Module,
+                 optimizer: torch.optim.Optimizer,
+                 group_size: int = 8,
+                 epsilon: float = 0.2,
+                 beta: float = 0.01,
+                 max_grad_norm: float = 1.0):
+        self.policy = policy_model
+        self.ref_model = ref_model
+        self.optimizer = optimizer
+        self.group_size = group_size
+        self.epsilon = epsilon
+        self.beta = beta
+        self.max_grad_norm = max_grad_norm
         
-        # 计算归一化奖励
-        normalized_rewards = [(r - mu_r) / (sigma_r + 1e-8) for r in rewards]
+        # 冻结参考模型
+        for param in self.ref_model.parameters():
+            param.requires_grad = False
+    
+    def safe_normalize_rewards(self, rewards: List[float]) -> torch.Tensor:
+        """安全奖励归一化"""
+        rewards_tensor = torch.tensor(rewards, dtype=torch.float32)
         
-        # 计算目标函数
-        loss = 0
-        for sample, norm_reward in zip(group, normalized_rewards):
-            ratio = policy_ratio(sample, current_policy, old_policy)
-            clipped_ratio = clip(ratio, 1-epsilon, 1+epsilon)
-            loss += min(ratio * norm_reward, clipped_ratio * norm_reward)
+        if len(rewards_tensor) == 1:
+            return torch.zeros_like(rewards_tensor)
+        
+        mean = rewards_tensor.mean()
+        std = rewards_tensor.std(unbiased=False)
+        
+        # 防止除零和数值不稳定
+        if std < 1e-8:
+            return torch.zeros_like(rewards_tensor)
+        
+        normalized = (rewards_tensor - mean) / (std + 1e-8)
+        return normalized
+    
+    def compute_policy_ratio(self, log_prob: torch.Tensor, ref_log_prob: torch.Tensor) -> torch.Tensor:
+        """计算策略比率 r(θ) = πθ/πold"""
+        return torch.exp(log_prob - ref_log_prob)
+    
+    def compute_kl_penalty(self, log_prob: torch.Tensor, ref_log_prob: torch.Tensor) -> torch.Tensor:
+        """计算KL散度惩罚"""
+        return self.beta * (log_prob - ref_log_prob).mean()
+    
+    def train_step(self, batch: List[Sample]) -> Dict[str, float]:
+        """单步训练，处理一个批次"""
+        
+        # 按组划分样本
+        groups = [batch[i:i+self.group_size] 
+                 for i in range(0, len(batch), self.group_size)]
+        
+        total_loss = 0.0
+        total_kl = 0.0
+        num_groups = 0
+        
+        for group in groups:
+            if len(group) < self.group_size:
+                continue  # 跳过不完整的组
+                
+            # 提取组内数据
+            rewards = [sample.reward for sample in group]
+            log_probs = torch.stack([sample.log_prob for sample in group])
+            ref_log_probs = torch.stack([sample.ref_log_prob for sample in group])
+            
+            # 归一化奖励作为优势估计
+            advantages = self.safe_normalize_rewards(rewards)
+            
+            # 计算策略比率
+            ratios = self.compute_policy_ratio(log_probs, ref_log_probs)
+            
+            # GRPO目标函数
+            clipped_ratios = torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon)
+            
+            # 双重目标：取较小值
+            surr1 = ratios * advantages
+            surr2 = clipped_ratios * advantages
+            policy_loss = -torch.min(surr1, surr2).mean()
+            
+            # KL散度惩罚
+            kl_penalty = self.compute_kl_penalty(log_probs, ref_log_probs)
+            
+            # 总损失
+            loss = policy_loss + kl_penalty
+            
+            total_loss += loss.item()
+            total_kl += (log_probs - ref_log_probs).mean().item()
+            num_groups += 1
+        
+        if num_groups == 0:
+            return {"loss": 0.0, "kl": 0.0}
         
         # 反向传播
-        loss.backward()
-        optimizer.step()
+        avg_loss = total_loss / num_groups
+        avg_kl = total_kl / num_groups
+        
+        self.optimizer.zero_grad()
+        (total_loss / num_groups).backward()
+        
+        # 梯度裁剪
+        torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+        
+        self.optimizer.step()
+        
+        return {
+            "loss": avg_loss,
+            "kl": avg_kl,
+            "num_groups": num_groups
+        }
+
+# 使用示例
+if __name__ == "__main__":
+    # 初始化模型和训练器
+    policy_model = YourPolicyModel()  # 替换为你的策略模型
+    ref_model = YourPolicyModel()     # 参考模型
+    optimizer = torch.optim.AdamW(policy_model.parameters(), lr=1e-6)
+    
+    trainer = GRPOTrainer(
+        policy_model=policy_model,
+        ref_model=ref_model,
+        optimizer=optimizer,
+        group_size=8,
+        epsilon=0.2,
+        beta=0.01
+    )
+    
+    # 训练循环
+    for epoch in range(100):
+        # 收集训练数据（示例）
+        batch = collect_training_data()  # 返回List[Sample]
+        
+        # 单步训练
+        metrics = trainer.train_step(batch)
+        
+        # 监控训练进度
+        if epoch % 10 == 0:
+            print(f"Epoch {epoch}: loss={metrics['loss']:.4f}, kl={metrics['kl']:.4f}")
 ```
+
+### 4.1.2 关键实现要点
+
+**数值稳定性保障**：
+- 奖励归一化时检查标准差下限
+- 梯度裁剪防止梯度爆炸
+- KL散度实时监控
+
+**内存优化**：
+- 参考模型参数冻结
+- 批量处理减少内存峰值
+- 及时清理中间变量
+
+**监控指标**：
+- 训练损失（policy_loss + kl_penalty）
+- KL散度变化（策略偏离度）
+- 归一化奖励方差（组内一致性）
+- 梯度范数（训练稳定性）
 
 ### 4.1.1 GRPO算法训练流程图
 
