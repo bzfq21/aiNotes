@@ -1,4 +1,4 @@
-# GRPO (Group Relative Policy Optimization) 算法详解
+# GRPO (Group Relative Policy Optimization) 算法
 
 ## 1. 背景与动机
 
@@ -13,7 +13,7 @@ GRPO 是一种基于强化学习的策略优化算法，由DeepSeek团队提出�
 | 特征 | GRPO | 传统PPO |
 |---|---|---|
 | 优势估计 | 组内相对奖励 | 需要价值网络 |
-| 计算复杂度 | O(G) | O(|S||A| + G) |
+| 计算复杂度 | O(G) | O(\|S\|\|A\| + G) |
 | 内存需求 | 无需额外网络 | 需要价值网络 |
 | 稳定性 | 高 | 中等 |
 
@@ -168,17 +168,6 @@ $$\text{Var}[\hat{r}_i] = \frac{1}{G}\left(1 + \frac{\gamma_2}{2}\right)$$
 
 $$\text{Var}[A^{\text{GAE}}] \approx \frac{\sigma_r^2}{(1-\gamma\lambda)^2}$$
 
-### 5.3 计算复杂度
-
-| 算法 | 每次更新计算复杂度 | 内存需求 |
-|---|---|---|
-| PPO | $O(\|S\|\|A\| + G)$ | 需要价值网络 |
-| GRPO | $O(G)$ | 无需额外网络 |
-
-其中：
-- $\|S\|$ 表示状态空间大小
-- $\|A\|$ 表示动作空间大小  
-- $G$ 表示组大小
 
 ## 6. 实际应用示例
 
