@@ -1,0 +1,10 @@
+agent第一步载入所有skills的元数据要求llm选择skill（大概率是通过相似度匹配）
+
+
+agent 选中某个skill之后再增加其相关的mcp tools进prompt，然后要求llm生成func的参数即可
+workflow已经在skill中确定了，llm无法改变不了执行路径
+
+
+skill包含两类文件即可，md和可执行函数（py/ts）要求和agent同一语言。md规定规则以及定义流程，可执行函数提供能力（同时 tool meta data也在此定义）
+
+模型训练不太容易训练出稳定的路径，但是确定性的认知的参数是比较好训练的。skills正好是解决稳定路径的最佳办法
