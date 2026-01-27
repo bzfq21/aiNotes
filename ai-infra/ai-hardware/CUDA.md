@@ -1,5 +1,5 @@
 
-CUDA（Compute Unified Device Architecture）是NVIDIA推出的并行计算平台和编程模型，它确实主要用于管理NVIDIA GPU进行通用计算，是一套完整的开发工具和API接口。
+CUDA（Compute Unified Device Architecture）是NVIDIA推出的并行计算平台和编程模型，它主要用于管理NVIDIA GPU进行通用计算，是一套完整的开发工具和API接口。
 
 CUDA的核心能力包括：
 • 数据并行：通过大量线程同时处理数据，充分利用GPU的数千个计算核心

@@ -531,6 +531,3 @@ def safe_normalize(rewards, epsilon=1e-8):
 2. Schulman et al. "Proximal Policy Optimization Algorithms" (2017)
 3. Wu et al. "Group Relative Policy Optimization for Fine-tuning Large Language Models" (2024)
 
----
-
-*注：本笔记基于GRPO在语言模型微调中的实际应用总结，结合了理论推导和实践经验的系统性分析。*
